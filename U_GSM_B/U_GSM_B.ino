@@ -1,0 +1,135 @@
+#include <SoftwareSerial.h>
+SoftwareSerial mySerial(11, 12);
+char msg;
+char call;
+String lat="16.697833",lng="74.197150";
+
+// Define pins for ultrasonic and buzze
+int const trigPin = 9;
+int const echoPin = 10;
+int const buzzPin = 13;
+
+// constants won't change. They're used here to set pin numbers:
+int const sosbtn = 3;
+int const emgbtn = 2; 
+int const callbtn = 4; // the number of the pushbutton pin
+
+
+// variables will change:
+int emgState = 0;         // variable for reading the pushbutton status
+int callState = 0;
+int sosstate = 0;
+
+int tag=0;
+
+
+void setup()
+{
+  Serial.begin(9600);
+  mySerial.begin(9600);
+  // initialize the pushbutton pin as an input:
+  pinMode(emgbtn, INPUT);
+  pinMode(callbtn, INPUT);
+  pinMode(sosbtn, INPUT);
+
+  
+  pinMode(trigPin, OUTPUT); // trig pin will have pulses output
+  pinMode(echoPin, INPUT); // echo pin should be input to get pulse width
+  pinMode(buzzPin, OUTPUT); // buzz pin is output to control buzzering
+
+  Serial.println("U_GSM_B Started");
+}
+
+
+void loop()
+{  
+    obstacleDetect();
+    
+  // read the state of the pushbutton value:
+  emgState = digitalRead(emgbtn);
+  callState = digitalRead(callbtn);
+  sosstate = digitalRead(sosbtn);
+  
+  // check if the pushbutton is pressed. If it is, the buttonState is HIGH:
+  if (emgState == HIGH) {
+    Serial.println("emg button pressed");
+
+     mySerial.println("ATD+917972304558;"); // ATDxxxxxxxxxx; -- watch out here for semicolon at the end!!
+     Serial.println("Calling  "); // print response over serial port
+      
+      
+      delay(10000);
+      mySerial.println("AT+CMGF=1");    //Sets the GSM Module in Text Mode
+      delay(1000);  // Delay of 1000 milli seconds or 1 second
+      mySerial.println("AT+CMGS=\"+917972304558\"\r"); // Replace x with mobile number
+      delay(1000);
+      //mySerial.println("I am in emergency!! Location at:https://maps.google.com/?q="+(lat)+","+(lng));// The SMS text you want to send
+      mySerial.println("I am in emergency! Location at:https://maps.google.com/?q=18.53563,73.82988");// The SMS text you want to send
+      delay(1000);
+       mySerial.println((char)26);// ASCII code of CTRL+Z
+      delay(1000);  
+  }
+
+  if (sosstate == HIGH) {
+      if(tag==0)
+      {
+            HangupCall();
+            tag=1;
+      }
+      else
+      {
+     // mySerial.println("ATD+100;"); // ATDxxxxxxxxxx; -- watch out here for semicolon at the end!!
+      Serial.println("Calling  police"); // print response over serial port
+      delay(1000);
+      tag=0;
+      }
+  }
+  
+  if (callState == HIGH) {
+      mySerial.println("ATA");
+      delay(1000);
+      {
+          call=mySerial.read();
+          Serial.print(call);
+      }
+  }
+
+     if (mySerial.available()>0)
+     Serial.write(mySerial.read());
+  
+}
+
+void HangupCall()
+{
+  mySerial.println("ATH");
+  Serial.println("Hangup Call");
+  delay(1000);
+}
+
+void obstacleDetect()
+{
+   // Duration will be the input pulse width and distance will be the distance to the obstacle in centimeters
+  int duration, distance;
+  // Output pulse with 1ms width on trigPin
+  digitalWrite(trigPin, HIGH); 
+  delay(1);
+  digitalWrite(trigPin, LOW);
+  // Measure the pulse input in echo pin
+  duration = pulseIn(echoPin, HIGH);
+  // Distance is half the duration devided by 29.1 (from datasheet)
+  distance = (duration/2) / 29.1;
+  //Serial.println(distance);
+  // if distance less than 0.5 meter and more than 0 (0 or less means over range) 
+    if (distance <= 120 && distance >=2) {
+      // Buzz
+      digitalWrite(buzzPin, HIGH);
+      delay(distance*2);
+      digitalWrite(buzzPin, LOW);
+      delay(distance*2);
+     // delay(60);
+    }
+    else {
+      // Don't buzz
+      digitalWrite(buzzPin, LOW);
+    }
+}
